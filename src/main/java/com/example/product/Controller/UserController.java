@@ -12,6 +12,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
@@ -194,6 +195,72 @@ public class UserController {
         } catch (Exception e) {
             response.put("status", "error");
             response.put("message", "An error occurred while deleting user");
+            response.put("details", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @PutMapping("/user")
+    public ResponseEntity<Map<String, Object>> updateUser(@RequestHeader(value = "Authorization", required = true) String authHeader, @RequestBody UserModel updatedUser) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Check if the Authorization header exists and starts with "Bearer"
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("status", "error");
+                response.put("message", "Authorization header is missing or invalid");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract token from the Authorization header
+            String token = authHeader.substring(7);
+
+            // Validate the token
+            if (!jwtService.validateToken(token)) {
+                response.put("status", "error");
+                response.put("message", "Invalid or expired token");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract the username (email) from the token
+            String email = jwtService.extractUsername(token);
+
+            // Retrieve the user details from the database using the email
+            UserModel user = userService.getUserByEmail(email);
+
+            // Check if the user exists
+            if (user == null) {
+                response.put("status", "error");
+                response.put("message", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            // Update the fields except the password (do not touch the password)
+            if (updatedUser.getFirstName() != null) {
+                user.setFirstName(updatedUser.getFirstName());
+            }
+            if (updatedUser.getLastName() != null) {
+                user.setLastName(updatedUser.getLastName());
+            }
+            if (updatedUser.getEmail() != null) {
+                user.setEmail(updatedUser.getEmail());
+            }
+            // (add more fields as necessary)
+
+            // Save the updated user data
+            userService.saveUser(user);
+
+            // Exclude the password when returning the user details
+            user.setPassword(null); // Set password to null to exclude it
+
+            response.put("status", "success");
+            response.put("message", "User details updated successfully");
+            response.put("details", user);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An error occurred while updating user details");
             response.put("details", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
