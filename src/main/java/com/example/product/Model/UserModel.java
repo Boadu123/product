@@ -1,5 +1,9 @@
 package com.example.product.Model;
 
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -34,9 +38,14 @@ public class UserModel {
     @NotBlank(message = "Email cannot be null or empty")
     private String email;
 
+    // @JsonIgnore
     @Column(nullable = false)
     @Size(min = 8, message = "Password must be at least 8 characters long")
     @NotBlank(message = "Password cannot be null or empty")
     private String password;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductModel> products;
 
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.product.Model.UserModel;
+import com.example.product.Repository.UserRepository;
 
 import jakarta.validation.Valid;
 
@@ -28,6 +30,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -46,6 +51,7 @@ public class UserController {
                 response.put("details", new ArrayList<>());
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
+    
 
             response.put("status", "success");
             response.put("message", "All users are available here.");
@@ -74,10 +80,8 @@ public class UserController {
 
         try {
             userService.registerUser(user);
-            String token = jwtService.generateToken(user.getEmail());
             response.put("status", "success");
             response.put("message", "User added successfully");
-            response.put("token", token);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
@@ -91,21 +95,35 @@ public class UserController {
     @PostMapping(value = "/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody UserModel userModel) {
         Map<String, Object> response = new HashMap<>();
-        
-        boolean isAuthenticated = userService.authenticate(userModel.getEmail(), userModel.getPassword());
-        
-        if (isAuthenticated) {
-            String token = jwtService.generateToken(userModel.getEmail());
-            
-            response.put("status", "success");
-            response.put("token", token);
-            return ResponseEntity.ok(response);
+
+        // Check if the user exists in the database
+        Optional<UserModel> optionalUser = userRepository.findByEmail(userModel.getEmail());
+
+        if (optionalUser.isPresent()) {
+            UserModel user = optionalUser.get();
+
+            // Check if the password is correct
+            boolean isAuthenticated = userService.authenticate(user.getEmail(), userModel.getPassword());
+
+            if (isAuthenticated) {
+                // Generate token with the correct user ID
+                String token = jwtService.generateToken(user.getEmail(), user.getId());
+
+                response.put("status", "success");
+                response.put("token", token);
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("status", "error");
+                response.put("message", "Invalid credentials");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
         } else {
             response.put("status", "error");
-            response.put("message", "Invalid credentials");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            response.put("message", "User not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
     }
+
 
     @GetMapping("/user")
     public ResponseEntity<Map<String, Object>> getLoggedInUserDetails(@RequestHeader(value = "Authorization", required = true) String authHeader) {
