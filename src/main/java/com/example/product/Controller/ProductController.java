@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -179,12 +180,86 @@ public class ProductController {
             }
         }
     
-        @PutMapping(value = "/products/{id}")
-        public ResponseEntity<Map<String, Object>> updateProduct(
+    @PutMapping(value = "/products/{id}")
+    public ResponseEntity<Map<String, Object>> updateProduct(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable("id") Long productId,
+            @Validated @RequestBody ProductModel productModel, 
+            BindingResult bindingResult) {
+       
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Validate the authentication header
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("status", "error");
+                response.put("message", "Unauthorized access. No token provided.");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+        
+            String token = authHeader.substring(7); // Extract token
+        
+            if (!jwtService.validateToken(token)) {
+                response.put("status", "error");
+                response.put("message", "Invalid or expired token");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+        
+            // Get the userId from the token
+            Long userId = jwtService.getUserIdFromToken(token);
+       
+            // Check if there are validation errors in the request body
+            if (bindingResult.hasErrors()) {
+                response.put("status", "error");
+                response.put("message", "Invalid input data");
+                response.put("details", bindingResult.getAllErrors());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        
+            // Retrieve the product by ID
+            Optional<ProductModel> existingProduct = productService.getProductById(productId);
+       
+            if (existingProduct.isEmpty()) {
+                response.put("status", "error");
+                response.put("message", "Product not found.");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        
+            ProductModel product = existingProduct.get();
+        
+            // Check if the logged-in user is the owner of the product
+            if (product.getUser().getId() != (userId)) {
+                response.put("status", "error");
+                response.put("message", "You are not authorized to update this product.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
+        
+            // Update the fields of the product
+            product.setProductName(productModel.getProductName());
+            product.setDescription(productModel.getDescription());
+            product.setPrice(productModel.getPrice());
+            product.setImage(productModel.getImage());
+        
+            // Save the updated product
+            ProductModel updatedProduct = productService.createProduct(product);
+        
+            response.put("status", "success");
+            response.put("message", "Product updated successfully.");
+            response.put("details", updatedProduct);
+            return ResponseEntity.ok(response);
+        
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An error occurred while updating the product.");
+            response.put("details", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            }
+        }
+        
+        @DeleteMapping(value = "/products/{id}")
+        public ResponseEntity<Map<String, Object>> deleteProduct(
                 @RequestHeader(value = "Authorization", required = false) String authHeader,
-                @PathVariable("id") Long productId,
-                @Validated @RequestBody ProductModel productModel, 
-                BindingResult bindingResult) {
+                @PathVariable("id") Long productId) {
         
             Map<String, Object> response = new HashMap<>();
         
@@ -207,14 +282,6 @@ public class ProductController {
                 // Get the userId from the token
                 Long userId = jwtService.getUserIdFromToken(token);
         
-                // Check if there are validation errors in the request body
-                if (bindingResult.hasErrors()) {
-                    response.put("status", "error");
-                    response.put("message", "Invalid input data");
-                    response.put("details", bindingResult.getAllErrors());
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-                }
-        
                 // Retrieve the product by ID
                 Optional<ProductModel> existingProduct = productService.getProductById(productId);
         
@@ -229,31 +296,25 @@ public class ProductController {
                 // Check if the logged-in user is the owner of the product
                 if (product.getUser().getId() != (userId)) {
                     response.put("status", "error");
-                    response.put("message", "You are not authorized to update this product.");
+                    response.put("message", "You are not authorized to delete this product.");
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
                 }
         
-                // Update the fields of the product
-                product.setProductName(productModel.getProductName());
-                product.setDescription(productModel.getDescription());
-                product.setPrice(productModel.getPrice());
-                product.setImage(productModel.getImage());
-        
-                // Save the updated product
-                ProductModel updatedProduct = productService.createProduct(product);
+                // Delete the product
+                productService.deleteProduct(productId);
         
                 response.put("status", "success");
-                response.put("message", "Product updated successfully.");
-                response.put("details", updatedProduct);
+                response.put("message", "Product deleted successfully.");
                 return ResponseEntity.ok(response);
         
             } catch (Exception e) {
                 response.put("status", "error");
-                response.put("message", "An error occurred while updating the product.");
+                response.put("message", "An error occurred while deleting the product.");
                 response.put("details", e.getMessage());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
         }
         
+
 
 }

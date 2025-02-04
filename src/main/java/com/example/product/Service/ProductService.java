@@ -31,4 +31,9 @@ public class ProductService {
     public ProductModel updateProduct(ProductModel productModel) {
         return productRepository.save(productModel);
     }
+
+    public void deleteProduct(Long productId) {
+        productRepository.deleteById(productId);
+    }
+    
 }
