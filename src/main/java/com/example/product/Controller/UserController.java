@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -83,6 +84,118 @@ public class UserController {
             response.put("message", "Error occurred while adding user");
             response.put("details", e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping(value = "/login")
+    public ResponseEntity<Map<String, Object>> login(@RequestBody UserModel userModel) {
+        Map<String, Object> response = new HashMap<>();
+        
+        boolean isAuthenticated = userService.authenticate(userModel.getEmail(), userModel.getPassword());
+        
+        if (isAuthenticated) {
+            String token = jwtService.generateToken(userModel.getEmail());
+            
+            response.put("status", "success");
+            response.put("token", token);
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("status", "error");
+            response.put("message", "Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+
+    @GetMapping("/user")
+    public ResponseEntity<Map<String, Object>> getLoggedInUserDetails(@RequestHeader(value = "Authorization", required = true) String authHeader) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("status", "error");
+                response.put("message", "Authorization header is missing or invalid");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract token from the header
+            String token = authHeader.substring(7);
+
+            // Validate and extract email (or username) from the token
+            if (!jwtService.validateToken(token)) {
+                response.put("status", "error");
+                response.put("message", "Invalid or expired token");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            String email = jwtService.extractUsername(token); // Extract email/username from the token
+
+            // Retrieve user details from the database using the email
+            UserModel user = userService.getUserByEmail(email);
+
+            if (user == null) {
+                response.put("status", "error");
+                response.put("message", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            response.put("status", "success");
+            response.put("message", "User details retrieved successfully");
+            response.put("details", user);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An error occurred while fetching user details");
+            response.put("details", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @DeleteMapping("/user")
+    public ResponseEntity<Map<String, Object>> deleteUser(@RequestHeader(value = "Authorization", required = true) String authHeader) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Check if the Authorization header exists and starts with "Bearer"
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.put("status", "error");
+                response.put("message", "Authorization header is missing or invalid");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract token from the Authorization header
+            String token = authHeader.substring(7);
+
+            // Validate the token
+            if (!jwtService.validateToken(token)) {
+                response.put("status", "error");
+                response.put("message", "Invalid or expired token");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Extract the username (email) from the token
+            String email = jwtService.extractUsername(token);
+
+            // Retrieve the user details from the database using the email
+            UserModel user = userService.getUserByEmail(email);
+
+            // Check if the user exists
+            if (user == null) {
+                response.put("status", "error");
+                response.put("message", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            // Delete the user from the database
+            userService.deleteUserByEmail(email);
+
+            response.put("status", "success");
+            response.put("message", "User deleted successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An error occurred while deleting user");
+            response.put("details", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
