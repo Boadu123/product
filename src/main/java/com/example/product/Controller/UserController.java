@@ -166,8 +166,7 @@ public class UserController {
     }
 
     @DeleteMapping("/user")
-    public ResponseEntity<Map<String, Object>> deleteUser(
-            @RequestHeader(value = "Authorization", required = true) String authHeader) {
+    public ResponseEntity<Map<String, Object>> deleteUser() {
         Map<String, Object> response = new HashMap<>();
 
         try {
@@ -209,9 +208,7 @@ public class UserController {
     }
 
     @PutMapping("/user")
-    public ResponseEntity<Map<String, Object>> updateUser(
-            @RequestHeader(value = "Authorization", required = true) String authHeader,
-            @RequestBody UserModel updatedUser) {
+    public ResponseEntity<Map<String, Object>> updateUser(@RequestBody UserModel updatedUser) {
         Map<String, Object> response = new HashMap<>();
 
         try {
