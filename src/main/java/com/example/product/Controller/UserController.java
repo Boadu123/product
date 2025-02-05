@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +32,7 @@ public class UserController {
 
     @Autowired
     private UserService userService;
-    
+
     @Autowired
     private UserRepository userRepository;
 
@@ -38,11 +40,12 @@ public class UserController {
     private JwtService jwtService;
 
     @GetMapping(value = "/users")
-    public ResponseEntity<Map<String, Object>> getUsers(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+    public ResponseEntity<Map<String, Object>> getUsers(
+            @RequestHeader(value = "Authorization", required = true) String authHeader) {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            
+
             List<UserModel> users = userService.getAllUsers();
 
             if (users.isEmpty()) {
@@ -51,7 +54,6 @@ public class UserController {
                 response.put("details", new ArrayList<>());
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
-    
 
             response.put("status", "success");
             response.put("message", "All users are available here.");
@@ -124,31 +126,25 @@ public class UserController {
         }
     }
 
-
     @GetMapping("/user")
-    public ResponseEntity<Map<String, Object>> getLoggedInUserDetails(@RequestHeader(value = "Authorization", required = true) String authHeader) {
+    public ResponseEntity<Map<String, Object>> getLoggedInUserDetails() {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // Get authentication object from SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            // If user is not authenticated
+            if (authentication == null || authentication.getPrincipal() == "anonymousUser") {
                 response.put("status", "error");
-                response.put("message", "Authorization header is missing or invalid");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                response.put("message", "User not authenticated");
+                return ResponseEntity.status(401).body(response);
             }
 
-            // Extract token from the header
-            String token = authHeader.substring(7);
+            // Extract username (email) from authentication
+            String email = authentication.getName();
 
-            // Validate and extract email (or username) from the token
-            if (!jwtService.validateToken(token)) {
-                response.put("status", "error");
-                response.put("message", "Invalid or expired token");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            String email = jwtService.extractUsername(token); // Extract email/username from the token
-
-            // Retrieve user details from the database using the email
+            // Retrieve user details from database
             UserModel user = userService.getUserByEmail(email);
 
             if (user == null) {
@@ -170,31 +166,25 @@ public class UserController {
     }
 
     @DeleteMapping("/user")
-    public ResponseEntity<Map<String, Object>> deleteUser(@RequestHeader(value = "Authorization", required = true) String authHeader) {
+    public ResponseEntity<Map<String, Object>> deleteUser(
+            @RequestHeader(value = "Authorization", required = true) String authHeader) {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Check if the Authorization header exists and starts with "Bearer"
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // Get authentication object from SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            // If user is not authenticated
+            if (authentication == null || authentication.getPrincipal() == "anonymousUser") {
                 response.put("status", "error");
-                response.put("message", "Authorization header is missing or invalid");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                response.put("message", "User not authenticated");
+                return ResponseEntity.status(401).body(response);
             }
 
-            // Extract token from the Authorization header
-            String token = authHeader.substring(7);
+            // Extract username (email) from authentication
+            String email = authentication.getName();
 
-            // Validate the token
-            if (!jwtService.validateToken(token)) {
-                response.put("status", "error");
-                response.put("message", "Invalid or expired token");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            // Extract the username (email) from the token
-            String email = jwtService.extractUsername(token);
-
-            // Retrieve the user details from the database using the email
+            // Retrieve user details from database
             UserModel user = userService.getUserByEmail(email);
 
             // Check if the user exists
@@ -219,31 +209,26 @@ public class UserController {
     }
 
     @PutMapping("/user")
-    public ResponseEntity<Map<String, Object>> updateUser(@RequestHeader(value = "Authorization", required = true) String authHeader, @RequestBody UserModel updatedUser) {
+    public ResponseEntity<Map<String, Object>> updateUser(
+            @RequestHeader(value = "Authorization", required = true) String authHeader,
+            @RequestBody UserModel updatedUser) {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Check if the Authorization header exists and starts with "Bearer"
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // Get authentication object from SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            // If user is not authenticated
+            if (authentication == null || authentication.getPrincipal() == "anonymousUser") {
                 response.put("status", "error");
-                response.put("message", "Authorization header is missing or invalid");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                response.put("message", "User not authenticated");
+                return ResponseEntity.status(401).body(response);
             }
 
-            // Extract token from the Authorization header
-            String token = authHeader.substring(7);
+            // Extract username (email) from authentication
+            String email = authentication.getName();
 
-            // Validate the token
-            if (!jwtService.validateToken(token)) {
-                response.put("status", "error");
-                response.put("message", "Invalid or expired token");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            // Extract the username (email) from the token
-            String email = jwtService.extractUsername(token);
-
-            // Retrieve the user details from the database using the email
+            // Retrieve user details from database
             UserModel user = userService.getUserByEmail(email);
 
             // Check if the user exists
