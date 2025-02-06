@@ -35,5 +35,18 @@ public class ProductService {
     public void deleteProduct(Long productId) {
         productRepository.deleteById(productId);
     }
+
+    public List<ProductModel> searchProductsByName(String productName) {
+        // Log the search term
+        System.out.println("Searching for products with name containing: " + productName);
     
+        List<ProductModel> products = productRepository.findByProductNameContainingIgnoreCase(productName);
+    
+        // Log the result
+        System.out.println("Found " + products.size() + " products.");
+        
+        return products;
+    }
+    
+
 }

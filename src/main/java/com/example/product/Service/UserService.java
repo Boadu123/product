@@ -18,11 +18,11 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    public List<UserModel> getAllUsers(){
+    public List<UserModel> getAllUsers() {
         return userRepository.findAll();
     }
 
-    public void registerUser(UserModel user){
+    public void registerUser(UserModel user) {
 
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email is already in use.");
@@ -35,13 +35,13 @@ public class UserService {
     public boolean authenticate(String email, String password) {
 
         Optional<UserModel> userOptional = userRepository.findByEmail(email);
-        
+
         if (userOptional.isPresent()) {
             UserModel user = userOptional.get();
-            
+
             return passwordEncoder.matches(password, user.getPassword());
         }
-        
+
         return false;
     }
 
@@ -51,7 +51,7 @@ public class UserService {
 
     public void deleteUserByEmail(String email) {
         UserModel user = userRepository.findByEmail(email).orElse(null);
-        
+
         if (user != null) {
             userRepository.delete(user);
         } else {
@@ -62,8 +62,5 @@ public class UserService {
     public void saveUser(UserModel user) {
         userRepository.save(user);
     }
-
-    
-    
 
 }

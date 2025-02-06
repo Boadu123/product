@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.product.Model.ProductModel;
@@ -91,7 +92,14 @@ public class ProductController {
 
             // Get the userId from the token (this assumes you have a method to extract the
             // // user ID
-            Long userId = jwtService.getUserIdFromToken((String) authentication.getCredentials());
+            String token = authentication.getCredentials() != null ? authentication.getCredentials().toString() : null;
+            if (token == null) {
+                response.put("status", "error");
+                response.put("message", "JWT token is missing.");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            Long userId = jwtService.getUserIdFromToken(token);
 
             // Check if there are validation errors in the request body
             if (bindingResult.hasErrors()) {
@@ -294,6 +302,43 @@ public class ProductController {
         } catch (Exception e) {
             response.put("status", "error");
             response.put("message", "An error occurred while deleting the product.");
+            response.put("details", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping(value = "/products/search")
+    public ResponseEntity<Map<String, Object>> searchProducts(@RequestParam String productName) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Get authentication object from SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            // If user is not authenticated
+            if (authentication == null || "anonymousUser".equals(authentication.getPrincipal())) {
+                response.put("status", "error");
+                response.put("message", "User not authenticated");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Search for products by name (case-insensitive)
+            List<ProductModel> products = productService.searchProductsByName(productName);
+
+            if (products.isEmpty()) {
+                response.put("status", "error");
+                response.put("message", "No products found matching the search criteria.");
+                response.put("details", new ArrayList<>());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            response.put("status", "success");
+            response.put("message", "Products found.");
+            response.put("details", products);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "An error occurred while searching for products.");
             response.put("details", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
