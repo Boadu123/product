@@ -38,7 +38,6 @@ public class UserModel {
     @NotBlank(message = "Email cannot be null or empty")
     private String email;
 
-    // @JsonIgnore
     @Column(nullable = false)
     @Size(min = 8, message = "Password must be at least 8 characters long")
     @NotBlank(message = "Password cannot be null or empty")
